@@ -1,4 +1,4 @@
-# dtorres-cloud-pipeline
+# s3-deploy-pipeline
 
 This repository demonstrates a **cloud CI/CD pipeline** built with **GitHub Actions** to deploy projects to AWS.  
 It highlights practical skills in **cloud automation, infrastructure pipelines, and cross-language development**.
