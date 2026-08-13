@@ -1,36 +1,43 @@
-name: Build & Push to ECR
+name: Build & Deploy Stream Overlay to S3
 
 on:
   push:
     branches:
       - main
 
-env:
-  AWS_REGION: us-east-2
-  ECR_REPOSITORY: spectra-stream
-
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Check out the repository
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      # 2. Set up Go (required by build.sh)
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          go-version: '1.24.x'
 
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
+      # 3. Make build.sh executable
+      - name: Make build script executable
+        run: chmod +x ./build.sh
 
-      - name: Build, tag, and push image
+      # 4. Run build.sh to produce the build/ directory
+      - name: Build stream-overlay
+        run: ./build.sh
+
+      # 5. Deploy static site and binary to S3
+      - name: Deploy to S3
         env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          AWS_S3_BUCKET: david-portfolio-site
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: us-east-1
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          # Sync your web assets to the bucket root (index.html, panel.html, etc.)
+          aws s3 sync build/stream-overlay-web/ s3://$AWS_S3_BUCKET/ --acl public-read --delete
+
+          # Upload your Go binary into a bin/ folder
+          aws s3 cp build/stream-overlay-server s3://$AWS_S3_BUCKET/bin/stream-overlay-server --acl public-read
